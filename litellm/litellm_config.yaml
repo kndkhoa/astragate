@@ -1,0 +1,63 @@
+# =============================================================================
+# LiteLLM Proxy Configuration
+# Mounted into the litellm container at /app/config.yaml
+# =============================================================================
+
+model_list:
+  # ---------------------------------------------------------------------------
+  # Primary models (Phase 1: free / low-cost providers)
+  # ---------------------------------------------------------------------------
+
+  # Groq — llama-3.1-8b (primary)
+  - model_name: llama-3.1-8b
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  # DeepSeek Chat
+  - model_name: deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # Google Gemini Flash
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # ---------------------------------------------------------------------------
+  # Fallback chains
+  # ---------------------------------------------------------------------------
+
+  # llama-3.1-8b fallback → deepseek-chat
+  - model_name: llama-3.1-8b
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  # deepseek-chat fallback → gemini-flash
+  - model_name: deepseek-chat
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  # AstraGate enforces a 30s timeout; give LiteLLM 25s to leave headroom
+  timeout: 25
+  retry_after: 0
+
+cache:
+  type: redis
+  host: redis
+  port: 6379
+  # 1-hour exact cache TTL
+  ttl: 3600
+
+litellm_settings:
+  # AstraGate handles all logging — disable LiteLLM success callbacks
+  success_callback: []
+  # Silently drop unknown parameters (e.g. custom fields from clients)
+  drop_params: true
