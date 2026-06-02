@@ -1,14 +1,19 @@
 """
-Gateway router — placeholder.
+Gateway router — OpenAI-compatible proxy endpoints.
 
-OpenAI-compatible endpoints implemented in Task 23.
+All /v1/* routes require Virtual Key authentication and are subject to the
+per-key rate limit. `enforce_rate_limit` depends on `require_virtual_key`,
+so a single router dependency covers both. Full pipeline implementation in
+Task 23.
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
-router = APIRouter()
+from app.middleware.rate_limit import enforce_rate_limit
+
+router = APIRouter(dependencies=[Depends(enforce_rate_limit)])
 
 
-# Placeholder — implemented in Task 23
+# Placeholder — full pipeline implemented in Task 23
 # POST /v1/chat/completions
 # POST /v1/embeddings
 # GET  /v1/models

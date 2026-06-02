@@ -30,6 +30,7 @@ from app.api.auth import router as auth_router
 from app.api.gateway import router as gateway_router
 from app.api.billing import router as billing_router
 from app.api.admin import router as admin_router
+from app.api.keys import router as keys_router
 
 # Configure structured JSON logging before anything else
 configure_logging(settings.LOG_LEVEL)
@@ -223,6 +224,7 @@ def create_app() -> FastAPI:
     application.include_router(auth_router, prefix="/auth", tags=["Auth"])
     application.include_router(gateway_router, prefix="/v1", tags=["Gateway"])
     application.include_router(billing_router, prefix="/api/billing", tags=["Billing"])
+    application.include_router(keys_router, prefix="/api/keys", tags=["Keys"])
     application.include_router(admin_router, prefix="/admin", tags=["Admin"])
 
     return application

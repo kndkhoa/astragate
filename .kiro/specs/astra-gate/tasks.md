@@ -109,7 +109,7 @@
 
 ## Milestone 2: Authentication & User Management
 
-- [ ] 6. Implement user registration and login (email/password)
+- [x] 6. Implement user registration and login (email/password)
   - `POST /auth/register` — validate email, hash password with bcrypt (cost=12), create user + credit_account (balance=$0), return JWT pair
   - `POST /auth/login` — verify password, check account lock, return access token (15min) + refresh token (7 days)
   - `POST /auth/logout` — invalidate refresh token
@@ -117,12 +117,12 @@
   - Implement login brute-force protection: track `failed_login_attempts` in DB, lock account for 15 min after 10 failures (Redis counter)
   - **Requirement:** 9 (AC1), 14 (AC2, AC5)
 
-- [~] 7. Implement Google OAuth login
+- [x] 7. Implement Google OAuth login
   - `POST /auth/oauth/google` — verify Google ID token, upsert user with `oauth_provider='google'`, return JWT pair
   - Handle case where email already exists with password auth (link accounts)
   - **Requirement:** 9 (AC1)
 
-- [~] 8. Implement JWT middleware and role-based access control
+- [x] 8. Implement JWT middleware and role-based access control
   - Create `middleware/auth.py` — extract and verify JWT from `Authorization: Bearer` header
   - Attach `current_user` to request state
   - Create `require_admin` dependency that rejects non-admin users with HTTP 403
@@ -130,7 +130,7 @@
   - Protect all `/admin/*` routes with `require_admin` dependency
   - **Requirement:** 14 (AC1), 11 (AC9)
 
-- [~] 9. Build auth UI pages (login, register)
+- [x] 9. Build auth UI pages (login, register)
   - `/login` page — email/password form + Google OAuth button
   - `/register` page — email/password form with validation
   - Handle JWT storage in httpOnly cookie or localStorage
@@ -141,14 +141,14 @@
 
 ## Milestone 3: Virtual Key Management
 
-- [~] 10. Implement Virtual Key backend (CRUD + hashing)
+- [x] 10. Implement Virtual Key backend (CRUD + hashing)
   - `POST /api/keys` — generate cryptographically random key (`ag-sk-{32 random chars}`), store SHA-256 hash + prefix, return plaintext once only; enforce max 10 keys per user
   - `GET /api/keys` — list keys with prefix, name, status, last_used_at, total_requests
   - `DELETE /api/keys/{id}` — set `is_active=false`, `revoked_at=now()`, invalidate Redis cache `vk:{key_hash}` immediately
   - Auto-create default key on user registration (name: "Default Key")
   - **Requirement:** 2 (AC1, AC2, AC3, AC4, AC5, AC6, AC7)
 
-- [~] 11. Implement Virtual Key auth middleware for gateway
+- [x] 11. Implement Virtual Key auth middleware for gateway
   - Extract Bearer token from `Authorization` header on all `/v1/*` requests
   - Compute SHA-256 hash, lookup in Redis cache (`vk:{hash}`, TTL 30s), fallback to PostgreSQL
   - Return HTTP 401 if key not found or `is_active=false`
@@ -156,7 +156,7 @@
   - Log suspicious usage: >10 unique IPs per key per hour → write to security log
   - **Requirement:** 2 (AC4, AC6), 13 (AC4), 14 (AC3, AC7)
 
-- [~] 12. Build API Keys UI page
+- [x] 12. Build API Keys UI page
   - `/dashboard/keys` — table of keys with prefix, name, status badge, created date, usage count
   - "Create Key" modal — name + description + optional RPM limit fields; show full key value once in a copy-to-clipboard dialog
   - "Revoke" button with confirmation dialog
@@ -165,21 +165,21 @@
 
 ## Milestone 4: Markup Engine & Provider Management
 
-- [~] 13. Implement markup resolution service
+- [x] 13. Implement markup resolution service
   - `services/markup.py` — `resolve_markup_rate(model_id, provider_id) -> float`
   - Priority: model.markup_rate (if not null) → markup_config[provider] → markup_config[global]
   - Cache resolved rate in Redis: `markup:{model_id}` TTL 60s
   - Invalidate cache on any markup update
   - **Requirement:** 4 (AC1, AC2, AC3, AC4, AC5)
 
-- [~] 14. Implement admin markup configuration endpoints
+- [x] 14. Implement admin markup configuration endpoints
   - `PUT /admin/markup/global` — update global default markup_rate (0.0–5.0)
   - `PUT /admin/providers/{id}/markup` — set provider-level markup in markup_config
   - `PUT /admin/models/{id}/markup` — set model.markup_rate directly (null = inherit)
   - `GET /admin/models` — return models with resolved markup rate, source level (model/provider/global), base price, and effective sell price
   - **Requirement:** 4 (AC1, AC5, AC6), 11 (AC7)
 
-- [~] 15. Implement provider management endpoints
+- [x] 15. Implement provider management endpoints
   - `GET /admin/providers` — list providers with balance, status, thresholds, burn rate
   - `PUT /admin/providers/{id}/balance` — manually update balance, write to provider_balance_log
   - `PUT /admin/providers/{id}/thresholds` — update warning_threshold and hard_stop_threshold (min $1 each)
@@ -187,7 +187,7 @@
   - Compute burn rate: sum of base_cost_usd from usage_records in last 24h / 24 = $/hour
   - **Requirement:** 5 (AC1, AC3, AC8, AC9, AC10), 11 (AC5, AC6)
 
-- [~] 16. Build Admin Models & Providers UI pages
+- [x] 16. Build Admin Models & Providers UI pages
   - `/admin/models` — table with model name, provider, base price (input/output per 1M), markup source badge, effective sell price; inline edit for markup rate
   - `/admin/providers` — cards per provider showing balance, status badge (color-coded), warning/hard_stop thresholds, burn rate, days remaining; "Update Balance" form; "Release Hard Stop" button (only visible when status=hard_stop)
   - **Requirement:** 4 (AC6), 5 (AC9), 11 (AC5, AC6, AC7)
@@ -195,14 +195,14 @@
 
 ## Milestone 5: Core Gateway Pipeline
 
-- [~] 17. Implement credit pre-check and hold service
+- [x] 17. Implement credit pre-check and hold service
   - `services/credit.py` — `estimate_max_cost(model_id, max_tokens, markup_rate) -> Decimal`
   - `hold_credit(user_id, request_id, amount)` — `SELECT ... FOR UPDATE` on credit_accounts, check balance ≥ amount, deduct hold amount atomically; return HTTP 402 if insufficient
   - `settle_credit(user_id, request_id, actual_cost)` — write final deduction to credit_accounts, insert credit_transactions record (type='usage'), release hold
   - `release_hold(user_id, request_id)` — restore held amount on error/timeout
   - **Requirement:** 3 (AC2, AC3, AC4, AC5)
 
-- [~] 18. Implement guardrail service
+- [x] 18. Implement guardrail service
   - `services/guardrail.py` — load banned keywords from DB, cache in Redis (`guardrails:keywords`, TTL 300s, invalidated on update)
   - `check_input(text: str) -> GuardrailResult` — scan all messages in request body
   - `check_output(text: str) -> GuardrailResult` — scan response content
@@ -210,14 +210,14 @@
   - Write `guardrail_events` record on violation
   - **Requirement:** 8 (AC1, AC2, AC3, AC4, AC6)
 
-- [~] 19. Implement rate limiting middleware
+- [x] 19. Implement rate limiting middleware
   - `middleware/rate_limit.py` — sliding window per Virtual Key using Redis
   - Key pattern: `rate_limit:{virtual_key_id}:{minute_window}`, TTL 120s
   - Skip check if `rate_limit_rpm` is null (unlimited)
   - Return HTTP 429 with `Retry-After` header on limit exceeded
   - **Requirement:** 8 (AC7), 2 (AC3)
 
-- [~] 20. Implement provider balance check and Hard Stop enforcement
+- [x] 20. Implement provider balance check and Hard Stop enforcement
   - `services/provider_balance.py` — `check_provider_status(provider_id) -> ProviderStatus`
   - Cache provider status in Redis: `provider_status:{provider_id}` TTL 30s
   - If status='hard_stop': check fallback_provider_id; if exists, rewrite request to fallback; if not, return HTTP 503
@@ -225,7 +225,7 @@
   - `check_thresholds(provider)` — after deduction, compare balance to warning_threshold and hard_stop_threshold; trigger alerts as needed
   - **Requirement:** 5 (AC2, AC4, AC5, AC6, AC7)
 
-- [~] 21. Implement LiteLLM Proxy HTTP client
+- [x] 21. Implement LiteLLM Proxy HTTP client
   - `services/litellm_client.py` — async httpx client with base_url from env `LITELLM_URL`
   - Add `Authorization: Bearer {LITELLM_MASTER_KEY}` header to all requests
   - `post_chat(body: dict) -> dict` — non-streaming call with 30s timeout; raise `LiteLLMTimeoutError` on timeout
@@ -233,7 +233,7 @@
   - `get_models() -> list` — fetch available models from LiteLLM
   - **Requirement:** 1 (AC1, AC2, AC4, AC6)
 
-- [~] 22. Implement post-processing background task
+- [x] 22. Implement post-processing background task
   - `services/post_process.py` — `post_process_usage(request_id, virtual_key_id, user_id, model_id, provider_id, litellm_response, markup_rate, start_time)`
   - Extract actual token counts from LiteLLM response
   - Compute base_cost_usd and billed_amount_usd
@@ -244,7 +244,7 @@
   - Call `check_thresholds()` for provider alerts
   - **Requirement:** 1 (AC3), 3 (AC4, AC5), 5 (AC2), 12 (AC1)
 
-- [~] 23. Implement gateway endpoints (OpenAI-compatible)
+- [-] 23. Implement gateway endpoints (OpenAI-compatible)
   - `POST /v1/chat/completions` — wire up full pipeline: auth middleware → credit hold → guardrail input → provider check → LiteLLM call → guardrail output (non-stream) → return response; background task for post-processing
   - `POST /v1/embeddings` — same pipeline minus guardrail output check
   - `GET /v1/models` — proxy to LiteLLM `/v1/models`, filter to active models only
