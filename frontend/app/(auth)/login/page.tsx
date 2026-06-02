@@ -1,6 +1,152 @@
+"use client";
+
+import { useState, useEffect, FormEvent } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { setTokens } from "@/lib/auth";
+
+interface TokenResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+}
 
 export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Handle Google OAuth callback (code or credential in URL params)
+  useEffect(() => {
+    const credential = searchParams.get("credential");
+    const oauthError = searchParams.get("error");
+
+    if (oauthError) {
+      setError("Google sign-in was cancelled or failed. Please try again.");
+      return;
+    }
+
+    if (credential) {
+      handleGoogleCallback(credential);
+    }
+  }, [searchParams]);
+
+  async function handleGoogleCallback(credential: string) {
+    setIsLoading(true);
+    setError("");
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      const response = await fetch(`${API_URL}/auth/oauth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ credential }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        setError(data?.detail || data?.error?.message || "Google sign-in failed");
+        return;
+      }
+
+      const data: TokenResponse = await response.json();
+      setTokens(data.access_token, data.refresh_token);
+      router.push("/dashboard");
+    } catch {
+      setError("Unable to complete Google sign-in. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  function validate(): boolean {
+    const errors: Record<string, string> = {};
+
+    if (!email.trim()) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Please enter a valid email address";
+    }
+
+    if (!password) {
+      errors.password = "Password is required";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setFieldErrors({});
+
+    if (!validate()) return;
+
+    setIsLoading(true);
+
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        const message =
+          data?.detail ||
+          data?.error?.message ||
+          "Invalid email or password";
+
+        if (response.status === 423) {
+          setError("Account is temporarily locked. Please try again later.");
+        } else if (response.status === 401) {
+          setError("Invalid email or password");
+        } else {
+          setError(message);
+        }
+        return;
+      }
+
+      const data: TokenResponse = await response.json();
+      setTokens(data.access_token, data.refresh_token);
+      router.push("/dashboard");
+    } catch {
+      setError("Unable to connect to the server. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setIsLoading(true);
+    try {
+      const API_URL =
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+      // Redirect to backend Google OAuth initiation endpoint
+      // The backend will redirect to Google's consent screen
+      window.location.href = `${API_URL}/auth/oauth/google/redirect?redirect_uri=${encodeURIComponent(window.location.origin + "/login")}`;
+    } catch {
+      setError("Unable to start Google sign-in. Please try again.");
+      setIsLoading(false);
+    }
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
@@ -16,47 +162,57 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Form shell — logic implemented in Task 9 */}
+        {/* Form */}
         <div className="rounded-lg border bg-card p-6 shadow-sm">
-          <form className="space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="email"
-                className="text-sm font-medium leading-none"
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Error message */}
+            {error && (
+              <div
+                role="alert"
+                className="rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
               >
-                Email
-              </label>
-              <input
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
                 id="email"
                 type="email"
                 placeholder="you@example.com"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                disabled={isLoading}
+                className={cn(fieldErrors.email && "border-destructive")}
               />
+              {fieldErrors.email && (
+                <p className="text-xs text-destructive">{fieldErrors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <label
-                htmlFor="password"
-                className="text-sm font-medium leading-none"
-              >
-                Password
-              </label>
-              <input
+              <Label htmlFor="password">Password</Label>
+              <Input
                 id="password"
                 type="password"
                 placeholder="••••••••"
-                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={isLoading}
+                className={cn(fieldErrors.password && "border-destructive")}
               />
+              {fieldErrors.password && (
+                <p className="text-xs text-destructive">{fieldErrors.password}</p>
+              )}
             </div>
 
-            <button
-              type="submit"
-              className="inline-flex h-9 w-full items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            >
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign In
-            </button>
+            </Button>
           </form>
 
           <div className="mt-4 flex items-center gap-4">
@@ -65,12 +221,15 @@ export default function LoginPage() {
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          {/* Google OAuth button — wired up in Task 9 */}
-          <button
+          {/* Google OAuth button */}
+          <Button
             type="button"
-            className="mt-4 inline-flex h-9 w-full items-center justify-center gap-2 rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            variant="outline"
+            className="mt-4 w-full"
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
           >
-            <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
               <path
                 d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                 fill="#4285F4"
@@ -89,7 +248,7 @@ export default function LoginPage() {
               />
             </svg>
             Continue with Google
-          </button>
+          </Button>
         </div>
 
         <p className="mt-4 text-center text-sm text-muted-foreground">
