@@ -62,8 +62,11 @@ function statusLabel(status: string) {
   }
 }
 
-function formatUsd(amount: number): string {
-  return `$${amount.toFixed(2)}`;
+function formatUsd(amount: number | string | undefined | null): string {
+  if (amount === undefined || amount === null) return "$0.00";
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (isNaN(num)) return "$0.00";
+  return `$${num.toFixed(2)}`;
 }
 
 // ── Provider Card Component ──────────────────────────────────────────────────
@@ -181,7 +184,7 @@ function ProviderCard({
           <div>
             <span className="text-muted-foreground">Days remaining:</span>{" "}
             <span className="font-medium">
-              {provider.days_remaining !== null
+              {provider.days_remaining !== null && provider.days_remaining !== undefined
                 ? provider.days_remaining === Infinity || provider.days_remaining > 999
                   ? "∞"
                   : `${provider.days_remaining.toFixed(1)}d`

@@ -123,6 +123,23 @@ class LiteLLMClient:
         """
         return await self._post_json(CHAT_COMPLETIONS_PATH, body)
 
+    async def post_embeddings(self, body: dict) -> dict:
+        """
+        Non-streaming embeddings call.
+
+        Args:
+            body: OpenAI-compatible request body.
+
+        Returns:
+            Parsed JSON response from LiteLLM.
+
+        Raises:
+            LiteLLMTimeoutError: If the call exceeds ``self.timeout``.
+            LiteLLMHTTPError: If LiteLLM returns a non-2xx response.
+            LiteLLMError: For other transport / decode failures.
+        """
+        return await self._post_json(EMBEDDINGS_PATH, body)
+
     async def stream_chat(self, body: dict) -> AsyncIterator[bytes]:
         """
         Streaming chat completion call. Yields raw SSE bytes.
@@ -317,6 +334,11 @@ def get_client() -> LiteLLMClient:
 async def post_chat(body: dict) -> dict:
     """Module-level shortcut: ``LiteLLMClient().post_chat(body)``."""
     return await get_client().post_chat(body)
+
+
+async def post_embeddings(body: dict) -> dict:
+    """Module-level shortcut: ``LiteLLMClient().post_embeddings(body)``."""
+    return await get_client().post_embeddings(body)
 
 
 def stream_chat(body: dict) -> AsyncIterator[bytes]:

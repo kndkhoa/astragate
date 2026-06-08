@@ -13,7 +13,7 @@ AstraGate là một LLM API Gateway SaaS được xây dựng theo mô hình **w
 - **Frontend (Dashboard):** Next.js 14 (App Router) + Tailwind CSS + shadcn/ui
 - **Payments:** Stripe Checkout + Stripe Webhooks
 - **Email:** Resend (transactional email)
-- **Deployment:** Docker Compose (Phase 1), Kubernetes-ready
+- **Deployment:** Docker Compose (Phase 1, 5 services trên `internal` bridge network), Kubernetes-ready — xem mục [Deployment Architecture](#deployment-architecture)
 
 ---
 
@@ -584,16 +584,68 @@ litellm_settings:
 
 ---
 
-## Docker Compose Layout
+## Deployment Architecture
+
+Toàn bộ hệ thống được đóng gói và chạy bằng **Docker Compose** (Phase 1), gồm **5 service** trên một bridge network nội bộ tên `internal`. Chỉ **2 service** được map port ra host (`api:8000`, `dashboard:3000`); 3 service hạ tầng còn lại (`litellm`, `postgres`, `redis`) **không expose** ra ngoài và chỉ truy cập được qua DNS nội bộ của Docker.
+
+### Deployment Topology
+
+```
+                         INTERNET / HOST
+                               │
+        ┌──────────────────────┴───────────────────────┐
+        │                                               │
+  :3000 │ (HTTP)                                  :8000 │ (HTTP)
+        ▼                                               ▼
+┌────────────────┐                          ┌────────────────────┐
+│   dashboard    │   browser → API (JWT)    │        api         │
+│  Next.js 14    │ ───────────────────────► │      FastAPI       │
+│ (multi-stage,  │                          │ (python:3.11-slim) │
+│  standalone)   │                          └─────────┬──────────┘
+└────────────────┘                                    │
+                          ┌───────────────┬───────────┼────────────────┐
+                          ▼               ▼           ▼                
+                   ┌────────────┐  ┌────────────┐  ┌──────────────┐    
+                   │  postgres  │  │   redis    │  │   litellm    │ ──► Groq
+                   │ 15-alpine  │  │  7-alpine  │  │  :4000       │ ──► DeepSeek
+                   │  :5432     │  │  :6379     │  │ (no host port)│ ──► Gemini
+                   └────────────┘  └────────────┘  └──────────────┘    (outbound
+                    (no host port)  (no host port)                      HTTPS)
+                   ══════════════ internal bridge network ══════════════
+```
+
+### Service Inventory
+
+| Service | Image / Build | Host port | Persistence | Vai trò |
+|---|---|---|---|---|
+| `api` | build `./backend` (python:3.11-slim) | **8000** | — | FastAPI gateway + business logic |
+| `dashboard` | build `./frontend` (node:20-alpine, multi-stage) | **3000** | — | Next.js dashboard (Customer + Admin) |
+| `litellm` | `ghcr.io/berriai/litellm:main-latest` | *none* | config volume (ro) | LLM proxy → providers |
+| `postgres` | `postgres:15-alpine` | *none* | `pgdata` | Primary database |
+| `redis` | `redis:7-alpine` | *none* | `redisdata` | Cache + rate-limit store |
+
+### Startup Ordering & Health
+
+- `api` `depends_on` healthcheck: chờ `postgres` (`pg_isready`) và `redis` (`redis-cli ping`) ở trạng thái **healthy**, và `litellm` ở trạng thái **started** trước khi khởi động.
+- `dashboard` `depends_on` `api`.
+- Tất cả service đặt `restart: unless-stopped`.
+
+### Image Build Strategy
+
+- **Backend** (`backend/Dockerfile`): single-stage — `pip install -e .`, chạy `uvicorn app.main:app` trên `0.0.0.0:8000`.
+- **Frontend** (`frontend/Dockerfile`): multi-stage (`deps` → `builder` → `runner`), dùng Next.js **standalone output** để image production gọn, chạy `node server.js` trên port 3000.
+
+### docker-compose.yml
 
 ```yaml
-# docker-compose.yml
+version: "3.9"
+
 services:
   api:
     build: ./backend
     ports: ["8000:8000"]
     environment:
-      DATABASE_URL: postgresql://...
+      DATABASE_URL: postgresql+asyncpg://astragate:${POSTGRES_PASSWORD}@postgres:5432/astragate
       REDIS_URL: redis://redis:6379
       LITELLM_URL: http://litellm:4000
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
@@ -601,36 +653,61 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       RESEND_API_KEY: ${RESEND_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
-    depends_on: [postgres, redis, litellm]
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      litellm: { condition: service_started }
     networks: [internal]
+    restart: unless-stopped
 
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    volumes: ["./litellm_config.yaml:/app/config.yaml"]
+    volumes: ["./litellm/litellm_config.yaml:/app/config.yaml"]
     environment:
       GROQ_API_KEY: ${GROQ_API_KEY}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
     command: ["--config", "/app/config.yaml", "--port", "4000"]
-    networks: [internal]   # NOT exposed to internet
+    networks: [internal]   # NO ports mapping — NOT exposed to internet
+    restart: unless-stopped
 
   dashboard:
     build: ./frontend
     ports: ["3000:3000"]
     environment:
-      NEXT_PUBLIC_API_URL: https://api.astragate.io
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+    depends_on: [api]
     networks: [internal]
+    restart: unless-stopped
 
   postgres:
     image: postgres:15-alpine
     volumes: ["pgdata:/var/lib/postgresql/data"]
+    environment:
+      POSTGRES_USER: astragate
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: astragate
     networks: [internal]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U astragate -d astragate"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     volumes: ["redisdata:/data"]
     networks: [internal]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   internal:
@@ -640,6 +717,14 @@ volumes:
   pgdata:
   redisdata:
 ```
+
+### Configuration & Secrets
+
+Tất cả secret được inject qua biến môi trường từ file `.env` (xem `.env.example`), không hardcode trong image: `POSTGRES_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `DB_ENCRYPTION_KEY`, `LITELLM_MASTER_KEY`, provider keys (`GROQ_API_KEY`, `DEEPSEEK_API_KEY`, `GEMINI_API_KEY`), `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `RESEND_API_KEY`.
+
+### Production Note (chưa có trong Phase 1)
+
+Compose hiện chưa có lớp reverse proxy / TLS termination; `api` và `dashboard` đang map trực tiếp ra host bằng HTTP. Khi triển khai production ra internet cần bổ sung reverse proxy + HTTPS (Caddy/Nginx) phía trước, như đã ghi trong mục Security Design.
 
 ---
 

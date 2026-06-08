@@ -44,12 +44,9 @@ def _make_virtual_key(
 def _make_request(auth_header=None, client_ip="192.168.1.1"):
     """Create a mock FastAPI Request."""
     request = MagicMock()
-    request.headers = {}
+    headers_dict = {}
     if auth_header is not None:
-        request.headers["Authorization"] = auth_header
-    request.headers.get = lambda key, default=None: request.headers.get(key, default)
-    # Fix: use a proper dict-like get
-    headers_dict = dict(request.headers)
+        headers_dict["Authorization"] = auth_header
     request.headers = MagicMock()
     request.headers.get = lambda key, default=None: headers_dict.get(key, default)
     request.client = MagicMock()

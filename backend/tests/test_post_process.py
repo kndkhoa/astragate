@@ -89,7 +89,10 @@ def _make_session(*, model=None, provider=None) -> AsyncMock:
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    db.execute = AsyncMock()
+    
+    mock_result = MagicMock()
+    mock_result.scalar_one_or_none = MagicMock(return_value=None)
+    db.execute = AsyncMock(return_value=mock_result)
 
     async def fake_get(cls, pk):
         # Match by class name to avoid importing the ORM in the test.
@@ -260,7 +263,7 @@ class TestPostProcessSuccess:
         assert ur.provider_name == "groq"
 
         # Virtual key counters update was issued.
-        assert db.execute.await_count == 1
+        assert db.execute.await_count == 2
         # Commit was called.
         db.commit.assert_awaited_once()
 
@@ -534,8 +537,15 @@ class TestVirtualKeyCounterUpdate:
                 session_factory=_make_session_factory(db),
             )
 
-        assert db.execute.await_count == 1
-        update_stmt = db.execute.call_args.args[0]
+        assert db.execute.await_count == 2
+        # Find the update statement call
+        update_stmt = None
+        for call in db.execute.call_args_list:
+            stmt = call.args[0]
+            if "UPDATE" in str(stmt.compile(compile_kwargs={"literal_binds": False})):
+                update_stmt = stmt
+                break
+        assert update_stmt is not None
         # SQLAlchemy Update: inspect the compiled values dict.
         compiled = update_stmt.compile(compile_kwargs={"literal_binds": False})
         params = compiled.params

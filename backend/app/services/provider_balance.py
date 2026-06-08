@@ -110,7 +110,37 @@ AlertEvent = str  # 'warning' | 'hard_stop'
 
 AlertHandler = Callable[[Provider, AlertEvent, Decimal], Awaitable[None]]
 
-_alert_handler: Optional[AlertHandler] = None
+
+async def _default_email_alert_handler(provider: Provider, event: AlertEvent, balance_after: Decimal) -> None:
+    """Default alert handler that sends email alerts to admins via Resend."""
+    from app.services.email import send_provider_warning, send_provider_hard_stop
+    from app.database import AsyncSessionLocal
+    from app.models.user import User
+
+    admin_emails = []
+    try:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(User.email).where(User.role == "admin", User.is_active == True)
+            )
+            admin_emails = [r[0] for r in result.all()]
+    except Exception as exc:
+        logger.error("failed_to_fetch_admin_emails_for_alert", error=str(exc))
+
+    if not admin_emails:
+        admin_emails = ["admin@astragate.io"]
+
+    for email in admin_emails:
+        try:
+            if event == "warning":
+                await send_provider_warning(email, provider.name, balance_after, provider.warning_threshold)
+            elif event == "hard_stop":
+                await send_provider_hard_stop(email, provider.name, balance_after)
+        except Exception as exc:
+            logger.error("failed_to_send_provider_alert_email", email=email, error=str(exc))
+
+
+_alert_handler: Optional[AlertHandler] = _default_email_alert_handler
 
 
 def register_alert_handler(handler: AlertHandler) -> None:

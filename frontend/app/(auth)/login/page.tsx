@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { setTokens } from "@/lib/auth";
+import { setTokens, isAdmin } from "@/lib/auth";
 
 interface TokenResponse {
   access_token: string;
@@ -16,7 +16,9 @@ interface TokenResponse {
   token_type: string;
 }
 
-export default function LoginPage() {
+import { Suspense } from "react";
+
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -61,7 +63,11 @@ export default function LoginPage() {
 
       const data: TokenResponse = await response.json();
       setTokens(data.access_token, data.refresh_token);
-      router.push("/dashboard");
+      if (isAdmin()) {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } catch {
       setError("Unable to complete Google sign-in. Please try again.");
     } finally {
@@ -124,7 +130,11 @@ export default function LoginPage() {
 
       const data: TokenResponse = await response.json();
       setTokens(data.access_token, data.refresh_token);
-      router.push("/dashboard");
+      if (isAdmin()) {
+        router.push("/admin");
+      } else {
+        router.push("/dashboard");
+      }
     } catch {
       setError("Unable to connect to the server. Please try again.");
     } finally {
@@ -262,5 +272,17 @@ export default function LoginPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </main>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

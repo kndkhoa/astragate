@@ -13,6 +13,7 @@ Usage:
 """
 import asyncio
 import sys
+import uuid
 from decimal import Decimal
 
 from sqlalchemy import text
@@ -115,19 +116,23 @@ async def seed() -> None:
             # ── 1. Insert providers (without fallback chains first) ──────────
             print("Seeding providers...")
             for p in PROVIDERS:
+                p_params = {
+                    "id": str(uuid.uuid4()),
+                    **{k: float(v) if isinstance(v, Decimal) else v for k, v in p.items()}
+                }
                 await session.execute(
                     text(
                         """
                         INSERT INTO providers
-                            (name, display_name, balance_usd, warning_threshold,
+                            (id, name, display_name, balance_usd, warning_threshold,
                              hard_stop_threshold, status, is_active)
                         VALUES
-                            (:name, :display_name, :balance_usd, :warning_threshold,
+                            (:id, :name, :display_name, :balance_usd, :warning_threshold,
                              :hard_stop_threshold, :status, :is_active)
                         ON CONFLICT (name) DO NOTHING
                         """
                     ),
-                    p,
+                    p_params,
                 )
 
             # ── 2. Set fallback chains: groq → deepseek → gemini ─────────────
@@ -165,20 +170,21 @@ async def seed() -> None:
                     text(
                         """
                         INSERT INTO models
-                            (provider_id, model_id, display_name,
+                            (id, provider_id, model_id, display_name,
                              input_price_per_1m, output_price_per_1m, is_active)
                         VALUES
-                            (:provider_id, :model_id, :display_name,
+                            (:id, :provider_id, :model_id, :display_name,
                              :input_price_per_1m, :output_price_per_1m, true)
                         ON CONFLICT (provider_id, model_id) DO NOTHING
                         """
                     ),
                     {
+                        "id": str(uuid.uuid4()),
                         "provider_id": provider_ids[provider_name],
                         "model_id": model_id,
                         "display_name": display_name,
-                        "input_price_per_1m": input_price,
-                        "output_price_per_1m": output_price,
+                        "input_price_per_1m": float(input_price),
+                        "output_price_per_1m": float(output_price),
                     },
                 )
 
@@ -189,8 +195,8 @@ async def seed() -> None:
             await session.execute(
                 text(
                     """
-                    INSERT INTO markup_config (scope, provider_id, model_id, markup_rate)
-                    SELECT 'global', NULL, NULL, 0.20
+                    INSERT INTO markup_config (id, scope, provider_id, model_id, markup_rate)
+                    SELECT :id, 'global', NULL, NULL, 0.20
                     WHERE NOT EXISTS (
                         SELECT 1 FROM markup_config
                         WHERE scope = 'global'
@@ -198,7 +204,8 @@ async def seed() -> None:
                           AND model_id IS NULL
                     )
                     """
-                )
+                ),
+                {"id": str(uuid.uuid4())},
             )
 
     await engine.dispose()

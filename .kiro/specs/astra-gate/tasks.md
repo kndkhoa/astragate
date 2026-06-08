@@ -215,7 +215,7 @@
   - Key pattern: `rate_limit:{virtual_key_id}:{minute_window}`, TTL 120s
   - Skip check if `rate_limit_rpm` is null (unlimited)
   - Return HTTP 429 with `Retry-After` header on limit exceeded
-  - **Requirement:** 8 (AC7), 2 (AC3)
+  - **Requirement:** 8 (AC7),(AC3)                                                                                           
 
 - [x] 20. Implement provider balance check and Hard Stop enforcement
   - `services/provider_balance.py` — `check_provider_status(provider_id) -> ProviderStatus`
@@ -244,7 +244,7 @@
   - Call `check_thresholds()` for provider alerts
   - **Requirement:** 1 (AC3), 3 (AC4, AC5), 5 (AC2), 12 (AC1)
 
-- [-] 23. Implement gateway endpoints (OpenAI-compatible)
+- [x] 23. Implement gateway endpoints (OpenAI-compatible)
   - `POST /v1/chat/completions` — wire up full pipeline: auth middleware → credit hold → guardrail input → provider check → LiteLLM call → guardrail output (non-stream) → return response; background task for post-processing
   - `POST /v1/embeddings` — same pipeline minus guardrail output check
   - `GET /v1/models` — proxy to LiteLLM `/v1/models`, filter to active models only
@@ -255,26 +255,26 @@
 
 ## Milestone 6: Billing & Stripe Integration
 
-- [~] 24. Implement Stripe Checkout top-up flow
+- [x] 24. Implement Stripe Checkout top-up flow
   - `POST /api/billing/topup` — create Stripe Checkout Session (mode=payment, min $5), return `checkout_url`
   - Store `stripe_payment_intent_id` in credit_transactions with status='pending'
   - `GET /api/billing/balance` — return current credit_accounts.balance_usd
   - `GET /api/billing/transactions` — paginated list of credit_transactions
   - **Requirement:** 3 (AC6, AC10)
 
-- [~] 25. Implement Stripe Webhook handler
+- [x] 25. Implement Stripe Webhook handler
   - `POST /api/billing/webhook` — verify `Stripe-Signature` header using `STRIPE_WEBHOOK_SECRET`; reject with 400 if invalid signature
   - Handle `payment_intent.succeeded` — find pending transaction by payment_intent_id, add amount to credit_accounts.balance_usd, update transaction status='completed', update last_topup_amount + last_topup_at
   - Handle `payment_intent.payment_failed` — update transaction status='failed', log error
   - Send payment confirmation email to Customer on success
   - **Requirement:** 3 (AC7, AC8), 14 (AC6)
 
-- [~] 26. Implement low-balance email alert for customers
+- [x] 26. Implement low-balance email alert for customers
   - After each credit settlement in post_process_usage: check if balance < 20% of last_topup_amount
   - If yes and `low_balance_alert_sent_at` is null or > 24h ago: send email via Resend, update `low_balance_alert_sent_at`
   - **Requirement:** 3 (AC9)
 
-- [~] 27. Build Billing UI page
+- [x] 27. Build Billing UI page
   - `/dashboard/billing` — show current balance prominently, "Add Credits" button (opens amount selector → redirects to Stripe Checkout)
   - Transaction history table: date, type, amount, status badge
   - Handle Stripe redirect back (success/cancel URL params)
@@ -283,13 +283,13 @@
 
 ## Milestone 7: Provider Alerts & Email Notifications
 
-- [~] 28. Implement provider balance alert system
+- [x] 28. Implement provider balance alert system
   - In `check_thresholds()`: after each balance deduction, compare to warning_threshold and hard_stop_threshold
   - Warning alert: if balance < warning_threshold AND (last_warning_alert_at is null OR > 1 hour ago) → send email to Admin, update last_warning_alert_at
   - Hard Stop activation: if balance < hard_stop_threshold → UPDATE providers SET status='hard_stop', hard_stop_activated_at=now(); DEL Redis cache; send immediate email to Admin
   - **Requirement:** 5 (AC4, AC5, AC8)
 
-- [~] 29. Implement Resend email service
+- [x] 29. Implement Resend email service
   - `services/email.py` — async Resend client wrapper
   - Templates (plain HTML): welcome, low_credit_warning, payment_confirmation, provider_warning, provider_hard_stop
   - `send_welcome(user_email, virtual_key_prefix)` — include Quick Start code snippets
@@ -302,7 +302,7 @@
 
 ## Milestone 8: Guardrails Admin
 
-- [~] 30. Implement guardrail keyword management endpoints
+- [x] 30. Implement guardrail keyword management endpoints
   - `GET /admin/guardrails` — list all keywords with scope and status
   - `POST /admin/guardrails` — add keyword (validate non-empty, scope in ['input','output','both'])
   - `PUT /admin/guardrails/{id}` — update keyword or scope
@@ -310,7 +310,7 @@
   - On any write: invalidate Redis cache `guardrails:keywords`
   - **Requirement:** 8 (AC5)
 
-- [~] 31. Build Guardrails UI page
+- [x] 31. Build Guardrails UI page
   - `/admin/guardrails` — table of keywords with scope badge and active status
   - "Add Keyword" form with keyword text + scope selector
   - Delete button with confirmation
@@ -320,24 +320,24 @@
 
 ## Milestone 9: Usage Analytics & Customer Dashboard
 
-- [~] 32. Implement usage query endpoints
+- [x] 32. Implement usage query endpoints
   - `GET /api/usage` — paginated usage_records for current user; filter by virtual_key_id, model_name, date range; return fields: timestamp, model, provider, tokens, billed_amount, latency_ms, cache_hit, is_fallback
   - `GET /api/usage/summary` — aggregate stats: total_requests, total_tokens, total_cost, cache_hit_rate, error_rate grouped by day for last 30 days
   - `GET /admin/usage/export` — stream CSV of usage_records for date range (admin only)
   - **Requirement:** 12 (AC1, AC3, AC4, AC6), 10 (AC3, AC4)
 
-- [~] 33. Build Customer Dashboard Overview and Usage pages
+- [x] 33. Build Customer Dashboard Overview and Usage pages
   - `/dashboard` (Overview) — credit balance card (auto-refresh every 60s), usage summary for today (requests, tokens, cost), recent 5 API calls table
   - `/dashboard/usage` — daily usage bar chart (Recharts) for last 30 days; filterable table of usage records with Virtual Key, model, tokens, cost, latency, cache hit badge
   - **Requirement:** 10 (AC2, AC3, AC4)
 
-- [~] 34. Implement admin analytics endpoints
+- [x] 34. Implement admin analytics endpoints
   - `GET /admin/overview` — total customers, today's revenue, today's requests, provider status summary
   - `GET /admin/customers` — list users with credit_balance, total_requests (last 30d), total_spend (last 30d), account status
   - `GET /admin/customers/{id}` — customer detail with usage_records (paginated)
   - **Requirement:** 11 (AC2, AC3, AC4), 12 (AC3)
 
-- [~] 35. Build Admin Dashboard Overview and Customers pages
+- [x] 35. Build Admin Dashboard Overview and Customers pages
   - `/admin` (Overview) — KPI cards: total customers, today revenue, today requests; provider status row (color-coded badges); simple line chart of daily revenue last 30 days
   - `/admin/customers` — searchable table with credit balance, usage, status; click row to see customer detail with usage history
   - **Requirement:** 11 (AC2, AC3, AC4)
@@ -345,13 +345,13 @@
 
 ## Milestone 10: Onboarding & Quick Start
 
-- [~] 36. Implement new user onboarding flow
+- [x] 36. Implement new user onboarding flow
   - On successful registration: create credit_account with $1.00 free credit, insert credit_transactions record (type='free_credit', amount=1.00), auto-create default Virtual Key named "Default Key"
   - Trigger welcome email (via Resend) within 2 minutes of registration
   - Return Virtual Key plaintext in registration response (shown once)
   - **Requirement:** 9 (AC2, AC4, AC6)
 
-- [~] 37. Build Quick Start page
+- [x] 37. Build Quick Start page
   - `/dashboard/quickstart` — shown automatically after first login if no API calls made yet
   - Display Virtual Key with copy button (masked after first view)
   - Code snippets in tabs: Python (openai SDK), Node.js (openai SDK), cURL — all pre-filled with user's actual Virtual Key and a working model name
@@ -361,27 +361,27 @@
 
 ## Milestone 11: Security Hardening & Production Readiness
 
-- [~] 38. Implement Provider API key encryption at rest
+- [x] 38. Implement Provider API key encryption at rest
   - Enable `pgcrypto` extension in PostgreSQL
   - Add `encrypted_api_key` column to providers table (or a separate `provider_credentials` table)
   - Encrypt/decrypt using AES-256 with `DB_ENCRYPTION_KEY` from environment
   - LiteLLM Proxy reads keys from environment variables (not from AstraGate DB) — document this separation clearly
   - **Requirement:** 14 (AC4)
 
-- [~] 39. Add HTTPS and security headers
+- [x] 39. Add HTTPS and security headers
   - Add Caddy or Nginx reverse proxy service to docker-compose for TLS termination
   - Configure security headers: `Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`
   - Ensure LiteLLM container has no published ports (internal network only)
   - **Requirement:** 14 (AC1), 1 (AC4)
 
-- [~] 40. Add structured logging and observability
+- [x] 40. Add structured logging and observability
   - Ensure all request logs include: request_id, virtual_key_prefix, model, latency_ms, status_code
   - Log all guardrail events, Hard Stop activations, and failed Stripe webhooks
   - Add `GET /health` detailed response: `{"status": "ok", "postgres": "ok", "redis": "ok", "litellm": "ok"}`
   - Verify 503 response and auto-reconnect on DB connection loss
   - **Requirement:** 12 (AC2, AC5), 15 (AC5, AC6, AC7)
 
-- [~] 41. Performance validation
+- [x] 41. Performance validation
   - Write a simple load test script (locust or k6) simulating 100 concurrent requests to `/v1/chat/completions` against a mock LiteLLM
   - Verify p95 latency overhead from AstraGate middleware (auth + credit check + guardrail) is under 50ms
   - Verify no credit race conditions under concurrent load (run 50 simultaneous requests from same user)
@@ -390,19 +390,19 @@
 
 ## Milestone 12: End-to-End Integration & Polish
 
-- [~] 42. Wire up cache hit detection and zero-cost billing
+- [x] 42. Wire up cache hit detection and zero-cost billing
   - Detect `cache_hit` from LiteLLM response metadata
   - When `cache_hit=true`: skip credit deduction (billed_amount=0), skip provider balance deduction, still write usage_record with `cache_hit=true`
   - Add cache hit rate to usage summary endpoints and dashboard analytics
   - Add Admin toggle for Exact Cache (update litellm_config.yaml cache section, restart LiteLLM container)
   - **Requirement:** 7 (AC2, AC3, AC5, AC6)
 
-- [~] 43. Implement CSV export for usage records
+- [x] 43. Implement CSV export for usage records
   - `GET /admin/usage/export?from=YYYY-MM-DD&to=YYYY-MM-DD` — stream CSV with headers: timestamp, customer_email, virtual_key_prefix, model, provider, input_tokens, output_tokens, base_cost_usd, markup_rate, billed_amount_usd, latency_ms, cache_hit
   - Use streaming response to avoid memory issues for large exports
   - **Requirement:** 12 (AC6)
 
-- [~] 44. Final integration testing and smoke tests
+- [x] 44. Final integration testing and smoke tests
   - End-to-end test: register → get Virtual Key → call `/v1/chat/completions` → verify usage_record created, credit deducted, provider balance deducted
   - Test credit insufficient flow: set balance to $0.001, verify HTTP 402 returned
   - Test Hard Stop flow: set provider balance below hard_stop_threshold, verify requests blocked and fallback used
@@ -411,7 +411,7 @@
   - Test streaming: verify SSE chunks arrive incrementally, not buffered
   - **Requirement:** All
 
-- [~] 45. Documentation and deployment guide
+- [x] 45. Documentation and deployment guide
   - Write `README.md` with: architecture overview, local dev setup (`make dev`), environment variables reference, how to add a new Provider to LiteLLM config
   - Write `DEPLOYMENT.md` with: production checklist (TLS, secrets, DB backups), how to update Provider balances, how to release a Hard Stop
   - Add API reference page in dashboard (`/docs`) linking to OpenAPI spec at `/openapi.json`

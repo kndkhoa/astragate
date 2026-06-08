@@ -1,6 +1,10 @@
 {
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(marketing)/page": "app/(marketing)/page.js",
+  "/admin/models/page": "app/admin/models/page.js",
+  "/admin/guardrails/page": "app/admin/guardrails/page.js",
+  "/admin/providers/page": "app/admin/providers/page.js",
   "/admin/page": "app/admin/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/admin/customers/page": "app/admin/customers/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/keys/page": "app/dashboard/keys/page.js"
 }

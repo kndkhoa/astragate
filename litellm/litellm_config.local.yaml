@@ -1,0 +1,38 @@
+# =============================================================================
+# LiteLLM Proxy Configuration — LOCAL DEV (no Docker, no Redis)
+# Only Gemini is configured since that's the only API key available locally.
+# Run with:
+#   litellm --config litellm/litellm_config.local.yaml --port 4000
+# =============================================================================
+
+model_list:
+  # Google Gemini Flash — mapped to the names AstraGate's gateway expects.
+  # AstraGate's MODEL_NAME_TO_DB_ID maps "gemini-flash" -> "gemini/gemini-1.5-flash".
+  # LiteLLM matches on the `model_name` it receives, so we register both the
+  # external alias and the db model_id to be safe.
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: gemini/gemini-1.5-flash
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  # Map the default "llama-3.1-8b" alias to Gemini too, so the quickstart /
+  # default model also works while you only have a Gemini key.
+  - model_name: llama-3.1-8b
+    litellm_params:
+      model: gemini/gemini-1.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 25
+  retry_after: 0
+
+litellm_settings:
+  success_callback: []
+  drop_params: true

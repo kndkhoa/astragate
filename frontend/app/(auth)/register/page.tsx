@@ -16,7 +16,9 @@ interface TokenResponse {
   token_type: string;
 }
 
-export default function RegisterPage() {
+import { Suspense } from "react";
+
+function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -293,5 +295,17 @@ export default function RegisterPage() {
         </p>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <main className="flex min-h-screen items-center justify-center bg-background px-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </main>
+    }>
+      <RegisterContent />
+    </Suspense>
   );
 }

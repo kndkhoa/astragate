@@ -18,7 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 import bcrypt
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, status
 from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
@@ -27,8 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.logging_config import get_logger
-from app.models.credit import CreditAccount
+from app.models.credit import CreditAccount, CreditTransaction
 from app.models.user import User
+from app.services.email import send_welcome
 from app.redis_client import get_redis
 from app.services.virtual_key import create_default_key
 
@@ -247,7 +248,7 @@ async def _reset_failed_login(user: User, db: AsyncSession) -> None:
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+async def register(body: RegisterRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Register a new user with email and password.
 
@@ -278,17 +279,31 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     db.add(user)
     await db.flush()  # Get user.id assigned
 
-    # Create credit account with $0 balance
+    # Create credit account with $1.00 balance (free credit)
     credit_account = CreditAccount(
         id=uuid.uuid4(),
         user_id=user.id,
-        balance_usd=Decimal("0"),
+        balance_usd=Decimal("1.0"),
     )
     db.add(credit_account)
+    
+    # Record the free credit transaction
+    transaction = CreditTransaction(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        type="free_credit",
+        amount_usd=Decimal("1.0"),
+        balance_after=Decimal("1.0"),
+        description="Signup free credit"
+    )
+    db.add(transaction)
     await db.flush()
 
     # Auto-create default Virtual Key (Requirement 2 AC1)
     _, default_key_plaintext = await create_default_key(db=db, user_id=user.id)
+    
+    # Schedule welcome email
+    background_tasks.add_task(send_welcome, user.email, default_key_plaintext[:8])
 
     logger.info(
         "user_registered",
@@ -370,7 +385,7 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/oauth/google", response_model=TokenResponse)
-async def oauth_google(body: GoogleOAuthRequest, db: AsyncSession = Depends(get_db)):
+async def oauth_google(body: GoogleOAuthRequest, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """
     Google OAuth login/signup.
 
@@ -469,17 +484,31 @@ async def oauth_google(body: GoogleOAuthRequest, db: AsyncSession = Depends(get_
     db.add(user)
     await db.flush()
 
-    # Create credit account with $0 balance
+    # Create credit account with $1.00 balance (free credit)
     credit_account = CreditAccount(
         id=uuid.uuid4(),
         user_id=user.id,
-        balance_usd=Decimal("0"),
+        balance_usd=Decimal("1.0"),
     )
     db.add(credit_account)
+    
+    # Record the free credit transaction
+    transaction = CreditTransaction(
+        id=uuid.uuid4(),
+        user_id=user.id,
+        type="free_credit",
+        amount_usd=Decimal("1.0"),
+        balance_after=Decimal("1.0"),
+        description="Signup free credit"
+    )
+    db.add(transaction)
     await db.flush()
 
     # Auto-create default Virtual Key (Requirement 2 AC1)
     _, default_key_plaintext = await create_default_key(db=db, user_id=user.id)
+    
+    # Schedule welcome email
+    background_tasks.add_task(send_welcome, user.email, default_key_plaintext[:8])
 
     logger.info(
         "google_oauth_user_registered",

@@ -29,11 +29,11 @@ from __future__ import annotations
 
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Any, Callable, Optional
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.logging_config import get_logger
@@ -295,13 +295,40 @@ async def _post_process_in_session(
                 db=db,
             )
         else:
-            await settle_credit(
+            new_balance = await settle_credit(
                 user_id=user_id,
                 request_id=request_id,
                 actual_cost=billed_amount,
                 usage_record_id=usage_record.id,
                 db=db,
             )
+            
+            # Check customer low credit balance warning (cooldown 24h)
+            from app.models.credit import CreditAccount
+            account_stmt = select(CreditAccount).where(CreditAccount.user_id == user_id)
+            account_res = await db.execute(account_stmt)
+            account = account_res.scalar_one_or_none()
+            if account and account.last_topup_amount:
+                threshold = account.last_topup_amount * Decimal("0.20")
+                if account.balance_usd < threshold:
+                    cooldown = datetime.now(timezone.utc) - timedelta(days=1)
+                    last_sent = account.low_balance_alert_sent_at
+                    if last_sent is not None and last_sent.tzinfo is None:
+                        last_sent = last_sent.replace(tzinfo=timezone.utc)
+                    if last_sent is None or last_sent < cooldown:
+                        from app.models.user import User
+                        user_stmt = select(User).where(User.id == user_id)
+                        user_res = await db.execute(user_stmt)
+                        user = user_res.scalar_one_or_none()
+                        if user:
+                            from app.services.email import send_low_credit
+                            topup_url = "http://localhost:3000/dashboard/billing"
+                            try:
+                                await send_low_credit(user.email, account.balance_usd, topup_url)
+                                account.low_balance_alert_sent_at = datetime.now(timezone.utc)
+                            except Exception as email_exc:
+                                logger.error("failed_to_send_low_credit_email", user_id=str(user_id), error=str(email_exc))
+
             await deduct_provider_balance(
                 provider_id=provider.id,
                 amount=base_cost,
