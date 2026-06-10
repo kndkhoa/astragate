@@ -1,1 +1,18 @@
-{}
+{
+  "app/dashboard/billing/page.tsx -> @/lib/supabase": {
+    "id": 6881,
+    "files": [
+      "static/chunks/44530001.6c59e531b1183853.js",
+      "static/chunks/385.06d9eaeaec14da5b.js",
+      "static/chunks/881.ef47c3a1d26a958d.js"
+    ]
+  },
+  "app/dashboard/page.tsx -> @/lib/supabase": {
+    "id": 6881,
+    "files": [
+      "static/chunks/44530001.6c59e531b1183853.js",
+      "static/chunks/385.06d9eaeaec14da5b.js",
+      "static/chunks/881.ef47c3a1d26a958d.js"
+    ]
+  }
+}

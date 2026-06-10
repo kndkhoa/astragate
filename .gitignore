@@ -2,3 +2,5 @@ node_modules/
 frontend/node_modules/
 .next/
 dist/
+.env
+k6

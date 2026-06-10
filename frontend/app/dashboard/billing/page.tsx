@@ -146,6 +146,41 @@ export default function BillingPage() {
       }
     };
     loadData();
+
+    // Subscribe to realtime balance updates
+    let channel: any = null;
+    const decoded = getDecodedToken();
+    const userId = decoded?.sub;
+
+    if (userId && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      import("@/lib/supabase").then(({ supabase }) => {
+        channel = supabase
+          .channel("billing-balance")
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "credit_accounts",
+              filter: `user_id=eq.${userId}`,
+            },
+            (payload) => {
+              if (payload.new && "balance_usd" in payload.new) {
+                setBalance(Number(payload.new.balance_usd));
+              }
+              // Also refresh transactions list to show the new top-up
+              fetchTransactions(1);
+            }
+          )
+          .subscribe();
+      });
+    }
+
+    return () => {
+      if (channel) {
+        channel.unsubscribe();
+      }
+    };
   }, [fetchBalance, fetchTransactions]);
 
   const handleTopup = async (e: React.FormEvent) => {

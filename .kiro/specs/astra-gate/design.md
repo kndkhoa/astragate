@@ -531,7 +531,6 @@ POST   /admin/guardrails        — Add keyword
 DELETE /admin/guardrails/{id}   — Remove keyword
 
 GET    /admin/usage/export      — Export CSV
-```
 
 ---
 

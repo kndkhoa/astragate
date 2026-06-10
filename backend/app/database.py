@@ -59,8 +59,9 @@ if is_sqlite:
 else:
     engine = create_async_engine(
         settings.DATABASE_URL,
-        pool_size=10,
-        max_overflow=20,
+        pool_size=8,
+        max_overflow=2,
+        pool_timeout=30.0,    # Wait up to 30s for a connection from the local pool
         pool_pre_ping=True,   # Verify connections before use (handles reconnect)
         pool_recycle=3600,    # Recycle connections after 1 hour
         echo=False,

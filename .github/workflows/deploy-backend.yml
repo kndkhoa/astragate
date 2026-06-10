@@ -1,0 +1,38 @@
+name: Deploy Backend to VPS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy-backend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            # Di chuyển vào thư mục dự án trên VPS
+            cd /root/astragate || exit 1
+            
+            # Kéo code mới nhất từ GitHub về
+            git pull origin main
+            
+            # Khởi động lại và rebuild các container Backend
+            docker compose up -d --build api redis litellm
+            
+            # Dọn dẹp các docker image cũ để tránh đầy ổ cứng VPS
+            docker image prune -f

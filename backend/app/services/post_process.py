@@ -225,12 +225,12 @@ async def _post_process_in_session(
     outer wrapper logs a single ``post_process_failed`` event.
     """
     try:
-        # 1. Pricing + display names come from the configured model and
-        #    provider rows. We deliberately re-fetch these here (rather than
-        #    threading them through every layer of the gateway) so the
-        #    background task only needs UUIDs from the request handler.
         model = await db.get(Model, model_id)
-        provider = await db.get(Provider, provider_id)
+        # Load provider with FOR UPDATE from the start to prevent lock upgrade deadlocks
+        provider_stmt = select(Provider).where(Provider.id == provider_id).with_for_update()
+        provider_res = await db.execute(provider_stmt)
+        provider = provider_res.scalar_one_or_none()
+
         if model is None or provider is None:
             logger.error(
                 "post_process_missing_model_or_provider",

@@ -13,18 +13,21 @@ model_list:
     litellm_params:
       model: groq/llama-3.1-8b-instant
       api_key: os.environ/GROQ_API_KEY
+      mock_response: "Hello! This is a mock response from llama-3.1-8b-instant."
 
   # DeepSeek Chat
   - model_name: deepseek-chat
     litellm_params:
       model: deepseek/deepseek-chat
       api_key: os.environ/DEEPSEEK_API_KEY
+      mock_response: "Hello! This is a mock response from deepseek-chat."
 
   # Google Gemini Flash
   - model_name: gemini-flash
     litellm_params:
       model: gemini/gemini-1.5-flash
       api_key: os.environ/GEMINI_API_KEY
+      mock_response: "Hello! This is a mock response from gemini-1.5-flash."
 
   # ---------------------------------------------------------------------------
   # Fallback chains
@@ -35,12 +38,14 @@ model_list:
     litellm_params:
       model: deepseek/deepseek-chat
       api_key: os.environ/DEEPSEEK_API_KEY
+      mock_response: "Hello! This is a fallback mock response from deepseek-chat."
 
   # deepseek-chat fallback → gemini-flash
   - model_name: deepseek-chat
     litellm_params:
       model: gemini/gemini-1.5-flash
       api_key: os.environ/GEMINI_API_KEY
+      mock_response: "Hello! This is a fallback mock response from gemini-1.5-flash."
 
 router_settings:
   routing_strategy: simple-shuffle

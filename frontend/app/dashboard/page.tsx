@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { CreditCard, Activity, Coins, ArrowUpRight, Shield } from "lucide-react";
 import { get } from "@/lib/api";
+import { getDecodedToken } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -98,12 +99,44 @@ export default function DashboardOverviewPage() {
   useEffect(() => {
     fetchData();
 
-    // Auto-refresh credit balance every 60 seconds (Task 33)
+    // Auto-refresh credit balance every 60 seconds (fallback)
     const interval = setInterval(() => {
       fetchBalance();
     }, 60000);
 
-    return () => clearInterval(interval);
+    // Realtime balance updates via Supabase
+    let channel: any = null;
+    const decoded = getDecodedToken();
+    const userId = decoded?.sub;
+
+    if (userId && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      import("@/lib/supabase").then(({ supabase }) => {
+        channel = supabase
+          .channel("dashboard-balance")
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "credit_accounts",
+              filter: `user_id=eq.${userId}`,
+            },
+            (payload) => {
+              if (payload.new && "balance_usd" in payload.new) {
+                setBalance(Number(payload.new.balance_usd));
+              }
+            }
+          )
+          .subscribe();
+      });
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (channel) {
+        channel.unsubscribe();
+      }
+    };
   }, [fetchData, fetchBalance]);
 
   function formatDateTime(dateStr: string) {
