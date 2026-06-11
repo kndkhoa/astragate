@@ -100,3 +100,7 @@ git push origin main
 * **Frontend:** Vercel sẽ tự bắt sự kiện và deploy tự động.
 * **Backend:** GitHub Actions sẽ kích hoạt Job `Deploy Backend to VPS`. Bạn có thể theo dõi tiến trình chạy trực quan trong tab **Actions** on GitHub. Nó sẽ SSH vào VPS của bạn, kéo code mới nhất về và tự động chạy lệnh:
   `docker compose up -d --build api redis litellm` để cập nhật dịch vụ mà không gây gián đoạn hệ thống.
+
+• Tài khoản Admin:  admin@astragate.io  /  admin123                                                                                
+• Tài khoản Customer:  demo-f1140ad7@test.com  /  password123                                                                      
+                                                                           

@@ -27,7 +27,7 @@ function LoginContent() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  // Handle Google OAuth callback (code or credential in URL params)
+  // Handle Google OAuth callback (code or credential in URL params/hash)
   useEffect(() => {
     const credential = searchParams.get("credential");
     const oauthError = searchParams.get("error");
@@ -39,6 +39,26 @@ function LoginContent() {
 
     if (credential) {
       handleGoogleCallback(credential);
+      return;
+    }
+
+    // Handle Implicit Flow redirect hash (e.g. #id_token=ey...)
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const params = new URLSearchParams(hash);
+      const idToken = params.get("id_token");
+      const hashError = params.get("error");
+
+      if (hashError) {
+        setError("Google sign-in failed. Please try again.");
+        return;
+      }
+
+      if (idToken) {
+        // Clear hash from address bar
+        window.history.replaceState({}, document.title, window.location.pathname);
+        handleGoogleCallback(idToken);
+      }
     }
   }, [searchParams]);
 
@@ -52,7 +72,7 @@ function LoginContent() {
       const response = await fetch(`${API_URL}/auth/oauth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
+        body: JSON.stringify({ id_token: credential }),
       });
 
       if (!response.ok) {
@@ -145,14 +165,18 @@ function LoginContent() {
   async function handleGoogleSignIn() {
     setIsLoading(true);
     try {
-      const API_URL =
-        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-      // Redirect to backend Google OAuth initiation endpoint
-      // The backend will redirect to Google's consent screen
-      window.location.href = `${API_URL}/auth/oauth/google/redirect?redirect_uri=${encodeURIComponent(window.location.origin + "/login")}`;
-    } catch {
-      setError("Unable to start Google sign-in. Please try again.");
+      const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        throw new Error("Google Client ID configuration is missing in environment variables.");
+      }
+      const redirectUri = window.location.origin + "/login";
+      const nonce = Math.random().toString(36).substring(2);
+      
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=id_token&scope=openid%20email%20profile&nonce=${nonce}`;
+      
+      window.location.href = googleAuthUrl;
+    } catch (err: any) {
+      setError(err.message || "Unable to start Google sign-in. Please try again.");
       setIsLoading(false);
     }
   }
