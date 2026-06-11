@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -47,7 +47,6 @@ class TopupRequest(BaseModel):
 @router.post("/topup")
 async def create_topup_session(
     body: TopupRequest,
-    request: Request,
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -57,6 +56,9 @@ async def create_topup_session(
     """
     amount = body.amount
     user_id = current_user.id
+    
+    # Log request headers to debug origin
+    logger.info("topup_request_headers", headers=dict(request.headers))
     
     # Resolve origin dynamically from request headers
     origin = request.headers.get("origin") or request.headers.get("Origin") or "http://localhost:3000"
@@ -175,10 +177,6 @@ async def get_transactions(
     txs = result.scalars().all()
     
     # Query total count
-    count_stmt = select(func.count(CreditTransaction.id)).where(CreditTransaction.user_id == current_user.id)
-    # Import func locally or use it if already imported (wait, let's use standard count query)
-    # Let's import func here to be safe
-    from sqlalchemy import func
     count_res = await db.execute(select(func.count()).select_from(CreditTransaction).where(CreditTransaction.user_id == current_user.id))
     total = count_res.scalar() or 0
 
