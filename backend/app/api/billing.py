@@ -9,7 +9,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -57,15 +57,20 @@ async def create_topup_session(
     amount = body.amount
     user_id = current_user.id
     
-    success_url = f"{settings.NEXT_PUBLIC_API_URL or 'http://localhost:3000'}/dashboard/billing?success=true"
-    cancel_url = f"{settings.NEXT_PUBLIC_API_URL or 'http://localhost:3000'}/dashboard/billing?cancel=true"
+    # Log request headers to debug origin
+    logger.info("topup_request_headers", headers=dict(request.headers))
+    
+    # Resolve origin dynamically from request headers
+    origin = request.headers.get("origin") or request.headers.get("Origin") or "http://localhost:3000"
+    success_url = f"{origin}/dashboard/billing?success=true"
+    cancel_url = f"{origin}/dashboard/billing?cancel=true"
 
     if IS_MOCK_STRIPE:
         # Stripe Mock Mode — generate mock checkout url
         mock_session_id = f"mock_session_{uuid.uuid4()}"
         # Point success url directly to a mock top-up trigger, or let the user click a button on dashboard
         mock_checkout_url = (
-            f"{settings.NEXT_PUBLIC_API_URL or 'http://localhost:3000'}/dashboard/billing"
+            f"{origin}/dashboard/billing"
             f"?mock_stripe_session=true&amount={amount}&session_id={mock_session_id}"
         )
         logger.info(
@@ -172,10 +177,6 @@ async def get_transactions(
     txs = result.scalars().all()
     
     # Query total count
-    count_stmt = select(func.count(CreditTransaction.id)).where(CreditTransaction.user_id == current_user.id)
-    # Import func locally or use it if already imported (wait, let's use standard count query)
-    # Let's import func here to be safe
-    from sqlalchemy import func
     count_res = await db.execute(select(func.count()).select_from(CreditTransaction).where(CreditTransaction.user_id == current_user.id))
     total = count_res.scalar() or 0
 
