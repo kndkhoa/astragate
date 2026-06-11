@@ -47,6 +47,7 @@ class TopupRequest(BaseModel):
 @router.post("/topup")
 async def create_topup_session(
     body: TopupRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -57,15 +58,17 @@ async def create_topup_session(
     amount = body.amount
     user_id = current_user.id
     
-    success_url = f"{settings.NEXT_PUBLIC_API_URL or 'http://localhost:3000'}/dashboard/billing?success=true"
-    cancel_url = f"{settings.NEXT_PUBLIC_API_URL or 'http://localhost:3000'}/dashboard/billing?cancel=true"
+    # Resolve origin dynamically from request headers
+    origin = request.headers.get("origin") or request.headers.get("Origin") or "http://localhost:3000"
+    success_url = f"{origin}/dashboard/billing?success=true"
+    cancel_url = f"{origin}/dashboard/billing?cancel=true"
 
     if IS_MOCK_STRIPE:
         # Stripe Mock Mode — generate mock checkout url
         mock_session_id = f"mock_session_{uuid.uuid4()}"
         # Point success url directly to a mock top-up trigger, or let the user click a button on dashboard
         mock_checkout_url = (
-            f"{settings.NEXT_PUBLIC_API_URL or 'http://localhost:3000'}/dashboard/billing"
+            f"{origin}/dashboard/billing"
             f"?mock_stripe_session=true&amount={amount}&session_id={mock_session_id}"
         )
         logger.info(
