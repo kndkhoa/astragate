@@ -10,6 +10,7 @@ import {
   CreditCard,
   LogOut,
   Zap,
+  BookOpen,
 } from "lucide-react";
 import { NavLink } from "@/components/shared/nav-link";
 import { isAuthenticated, clearTokens } from "@/lib/auth";
@@ -17,6 +18,7 @@ import { isAuthenticated, clearTokens } from "@/lib/auth";
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard, exact: true },
   { href: "/dashboard/keys", label: "API Keys", icon: Key },
+  { href: "/dashboard/quickstart", label: "API Docs", icon: BookOpen },
   { href: "/dashboard/usage", label: "Usage", icon: BarChart2 },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
 ];
