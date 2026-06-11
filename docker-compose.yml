@@ -73,3 +73,5 @@ services:
 volumes:
   redisdata:
 
+# Trigger deploy after setting up secrets
+
