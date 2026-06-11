@@ -47,6 +47,7 @@ class TopupRequest(BaseModel):
 @router.post("/topup")
 async def create_topup_session(
     body: TopupRequest,
+    request: Request,
     current_user: User = Depends(get_current_user),
 ):
     """
