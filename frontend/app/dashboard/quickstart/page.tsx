@@ -170,8 +170,8 @@ main();`;
       <div className="rounded-xl border border-blue-200/40 bg-blue-50/5 p-5 space-y-3 dark:border-blue-900/40 dark:bg-blue-950/5">
         <h4 className="font-semibold text-sm text-blue-700 dark:text-blue-400">💡 Lựa chọn Model & API Key thống nhất</h4>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Với AstraGate, bạn chỉ cần dùng **1 API Key (Virtual Key) duy nhất** để truy cập vào nhiều mô hình AI khác nhau. 
-          Khi gọi API, bạn có thể tùy chọn mô hình muốn sử dụng bằng cách thay đổi giá trị của trường <code>"model"</code> trong request body. 
+          Với AstraGate, bạn chỉ cần dùng <strong>1 API Key (Virtual Key) duy nhất</strong> để truy cập vào nhiều mô hình AI khác nhau. 
+          Khi gọi API, bạn có thể tùy chọn mô hình muốn sử dụng bằng cách thay đổi giá trị của trường <code>&quot;model&quot;</code> trong request body. 
           AstraGate sẽ tự động kiểm tra số dư ví, định tuyến request và kích hoạt luồng fallback (dự phòng) đến các Provider phù hợp.
         </p>
         <div className="text-xs text-muted-foreground space-y-1.5">
