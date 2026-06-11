@@ -110,22 +110,27 @@ async def test_full_lifecycle_register_to_usage():
         assert "choices" in chat_data
         assert len(chat_data["choices"]) > 0
 
-        # 4. Wait for background post-processing
-        await asyncio.sleep(2)
+        # 4. Wait for background post-processing (with polling)
+        usage_record_found = False
+        usage_data = None
+        for _ in range(20):  # Poll up to 10 seconds (20 * 0.5s)
+            await asyncio.sleep(0.5)
+            usage_resp = await client.get(
+                f"{BASE_URL}/api/usage",
+                headers=auth_headers(access_token),
+            )
+            if usage_resp.status_code == 200:
+                usage_data = usage_resp.json()
+                if usage_data["pagination"]["total_count"] >= 1:
+                    usage_record_found = True
+                    break
 
-        # 5. Verify usage record created
-        usage_resp = await client.get(
-            f"{BASE_URL}/api/usage",
-            headers=auth_headers(access_token),
-        )
-        assert usage_resp.status_code == 200
-        usage_data = usage_resp.json()
-        assert usage_data["pagination"]["total_count"] >= 1
+        assert usage_record_found, f"Usage record not found after timeout. Last response: {usage_data}"
         record = usage_data["records"][0]
         assert record["model_name"] is not None
         assert record["billed_amount_usd"] >= 0
 
-        # 6. Verify credit was deducted
+        # 6. Verify credit was deducted (also with polling if needed, but since usage is committed, balance should be updated)
         balance_resp2 = await client.get(
             f"{BASE_URL}/api/billing/balance",
             headers=auth_headers(access_token),

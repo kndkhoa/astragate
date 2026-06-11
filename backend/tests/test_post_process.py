@@ -89,10 +89,27 @@ def _make_session(*, model=None, provider=None) -> AsyncMock:
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    
-    mock_result = MagicMock()
-    mock_result.scalar_one_or_none = MagicMock(return_value=None)
-    db.execute = AsyncMock(return_value=mock_result)
+
+    async def fake_execute(stmt, *args, **kwargs):
+        stmt_str = str(stmt).lower()
+        mock_res = MagicMock()
+        if "from provider" in stmt_str:
+            mock_res.scalar_one_or_none.return_value = provider
+        elif "from credit_account" in stmt_str:
+            account = MagicMock()
+            account.balance_usd = Decimal("100.00")
+            account.last_topup_amount = Decimal("50.00")
+            account.low_balance_alert_sent_at = None
+            mock_res.scalar_one_or_none.return_value = account
+        elif "from user" in stmt_str:
+            u = MagicMock()
+            u.email = "test@example.com"
+            mock_res.scalar_one_or_none.return_value = u
+        else:
+            mock_res.scalar_one_or_none.return_value = None
+        return mock_res
+
+    db.execute = AsyncMock(side_effect=fake_execute)
 
     async def fake_get(cls, pk):
         # Match by class name to avoid importing the ORM in the test.
@@ -263,7 +280,8 @@ class TestPostProcessSuccess:
         assert ur.provider_name == "groq"
 
         # Virtual key counters update was issued.
-        assert db.execute.await_count == 2
+        # Now 3 execute calls: 1 for provider, 1 for credit account low-balance check, 1 for virtual key update.
+        assert db.execute.await_count == 3
         # Commit was called.
         db.commit.assert_awaited_once()
 
@@ -379,7 +397,8 @@ class TestPostProcessCacheHit:
         assert ur.output_tokens == 50
 
         # Virtual key counters still updated for cache hits.
-        assert db.execute.await_count == 1
+        # Now 2 execute calls: 1 for provider, 1 for virtual key update.
+        assert db.execute.await_count == 2
         db.commit.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -537,12 +556,13 @@ class TestVirtualKeyCounterUpdate:
                 session_factory=_make_session_factory(db),
             )
 
-        assert db.execute.await_count == 2
+        # Now 3 execute calls: 1 for provider, 1 for credit account low-balance check, 1 for virtual key update.
+        assert db.execute.await_count == 3
         # Find the update statement call
         update_stmt = None
         for call in db.execute.call_args_list:
             stmt = call.args[0]
-            if "UPDATE" in str(stmt.compile(compile_kwargs={"literal_binds": False})):
+            if "UPDATE virtual_keys" in str(stmt.compile(compile_kwargs={"literal_binds": False})):
                 update_stmt = stmt
                 break
         assert update_stmt is not None
