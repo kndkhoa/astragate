@@ -17,6 +17,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       DB_ENCRYPTION_KEY: ${DB_ENCRYPTION_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
     depends_on:
       redis:
         condition: service_healthy
